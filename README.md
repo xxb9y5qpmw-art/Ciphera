@@ -1369,3 +1369,219 @@ function ChallengeCard({ challenge }) {
 
   return <div>{challenge.title}</div>;
 }
+/admin
+/admin/users
+/admin/challenges
+/admin/submissions
+/admin/revenue
+/admin/securityALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user';
+user
+admin
+super_adminfrom flask import abort
+from flask_login import current_user
+from functools import wraps
+
+def admin_required(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        if current_user.role not in ["admin", "super_admin"]:
+            abort(403)
+        return f(*args, **kwargs)
+    return wrapper@app.route("/admin/stats")
+@login_required
+@admin_required
+def admin_stats():
+    db = get_db()
+
+    users = db.execute("SELECT COUNT(*) as c FROM users").fetchone()["c"]
+    pro_users = db.execute("SELECT COUNT(*) as c FROM users WHERE is_pro = 1").fetchone()["c"]
+    submissions = db.execute("SELECT COUNT(*) as c FROM submissions").fetchone()["c"]
+    suspicious = db.execute("SELECT COUNT(*) as c FROM user_challenges WHERE suspicious = 1").fetchone()["c"]
+
+    return jsonify({
+        "users": users,
+        "pro_users": pro_users,
+        "submissions": submissions,
+        "suspicious_flags": suspicious
+    })@app.route("/admin/users")
+@login_required
+@admin_required
+def admin_users():
+    db = get_db()
+
+    rows = db.execute("""
+        SELECT id, email, is_pro, role
+        FROM users
+        ORDER BY id DESC
+    """).fetchall()
+
+    return jsonify([dict(r) for r in rows])@app.route("/admin/users")
+@login_required
+@admin_required
+def admin_users():
+    db = get_db()
+
+    rows = db.execute("""
+        SELECT id, email, is_pro, role
+        FROM users
+        ORDER BY id DESC
+    """).fetchall()
+
+    return jsonify([dict(r) for r in rows])
+    @app.route("/admin/users/ban", methods=["POST"])
+@login_required
+@admin_required
+def ban_user():
+    user_id = request.json["user_id"]
+
+    db = get_db()
+    db.execute(
+        "UPDATE users SET banned = 1 WHERE id = ?",
+        (user_id,)
+    )
+    db.commit()
+
+    return jsonify({"status": "banned"})@app.route("/admin/stats")
+@login_required
+@admin_required
+def admin_stats():
+    db = get_db()
+
+    users = db.execute("SELECT COUNT(*) as c FROM users").fetchone()["c"]
+    pro_users = db.execute("SELECT COUNT(*) as c FROM users WHERE is_pro = 1").fetchone()["c"]
+    submissions = db.execute("SELECT COUNT(*) as c FROM submissions").fetchone()["c"]
+    suspicious = db.execute("SELECT COUNT(*) as c FROM user_challenges WHERE suspicious = 1").fetchone()["c"]
+
+    return jsonify({
+        "users": users,
+        "pro_users": pro_users,
+        "submissions": submissions,
+        "suspicious_flags": suspicious
+    })@app.route("/admin/users")
+@login_required
+@admin_required
+def admin_users():
+    db = get_db()
+
+    rows = db.execute("""
+        SELECT id, email, is_pro, role
+        FROM users
+        ORDER BY id DESC
+    """).fetchall()
+
+    return jsonify([dict(r) for r in rows])
+    ALTER TABLE users ADD COLUMN banned INTEGER DEFAULT 0;@app.route("/admin/suspicious")
+@login_required
+@admin_required
+def suspicious_activity():
+    db = get_db()
+
+    rows = db.execute("""
+        SELECT user_id, challenge_id, attempts, suspicious
+        FROM user_challenges
+        WHERE suspicious = 1
+    """).fetchall()
+
+    return jsonify([dict(r) for r in rows])@app.route("/admin/revenue")
+@login_required
+@admin_required
+def revenue():
+    db = get_db()
+
+    pro = db.execute(
+        "SELECT COUNT(*) as c FROM users WHERE is_pro = 1"
+    ).fetchone()["c"]
+
+    monthly = pro * 10
+
+    return jsonify({
+        "pro_users": pro,
+        "estimated_mrr": monthly
+    })@app.route("/admin/revenue")
+@login_required
+@admin_required
+def revenue():
+    db = get_db()
+
+    pro = db.execute(
+        "SELECT COUNT(*) as c FROM users WHERE is_pro = 1"
+    ).fetchone()["c"]
+
+    monthly = pro * 10
+
+    return jsonify({
+        "pro_users": pro,
+        "estimated_mrr": monthly
+    })@app.route("/admin/revenue")
+@login_required
+@admin_required
+def revenue():
+    db = get_db()
+
+    pro = db.execute(
+        "SELECT COUNT(*) as c FROM users WHERE is_pro = 1"
+    ).fetchone()["c"]
+
+    monthly = pro * 10
+
+    return jsonify({
+        "pro_users": pro,
+        "estimated_mrr": monthly
+    })function AdminDashboard() {
+  const [stats, setStats] = useState(null)
+
+  useEffect(() => {
+    fetch("/admin/stats")
+      .then(r => r.json())
+      .then(setStats)
+  }, [])
+
+  if (!stats) return <div>Loading...</div>
+
+  return (
+    <div>
+      <h1>Admin Dashboard</h1>
+
+      <div>Users: {stats.users}</div>
+      <div>Pro Users: {stats.pro_users}</div>
+      <div>Submissions: {stats.submissions}</div>
+      <div>Suspicious Flags: {stats.suspicious_flags}</div>
+    </div>
+  )
+}pip install bcryptimport bcrypt
+
+def hash_password(password):
+    return bcrypt.hashpw(password.encode(), bcrypt.gensalt())
+
+def check_password(password, hashed):
+    return bcrypt.checkpw(password.encode(), hashed)pip install flask-wtffrom flask_wtf.csrf import CSRFProtect
+
+csrf = CSRFProtect(app)@app.after_request
+def set_security_headers(resp):
+
+    resp.headers["X-Frame-Options"] = "DENY"
+    resp.headers["X-Content-Type-Options"] = "nosniff"
+    resp.headers["X-XSS-Protection"] = "1; mode=block"
+    resp.headers["Content-Security-Policy"] = "default-src 'self'"
+
+    return respfrom flask_limiter import Limiter
+
+limiter = Limiter(app)
+
+@app.route("/login", methods=["POST"])
+@limiter.limit("5 per minute")
+def login():
+    ...def log_admin_login(user_id):
+
+    db = get_db()
+
+    db.execute("""
+        INSERT INTO audit_log
+        (user_id, action, created_at)
+        VALUES (?, 'admin_login', CURRENT_TIMESTAMP)
+    """, (user_id,))
+
+    db.commit()"whsec_YOUR_WEBHOOK_SECRET"import os
+
+STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET")/admin/*if not isinstance(data["aes_ciphertext"], str):
+    abort(400)
